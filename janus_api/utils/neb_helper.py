@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from ase.io import write as ase_write
 
 from janus_core.calculations.neb import NEB
 from janus_core.helpers.janus_types import Architectures
@@ -18,10 +24,11 @@ def neb(
     n_images: int = 15,
     fmax: float = 0.1,
     steps: int = 100,
+    interpolator: str = "pymatgen",
     results_path: Path = DATA_DIR,
 ) -> dict:
     """
-    Run NEB calculation and return barrier information.
+    Run NEB calculation and return barrier, energy profile SVG, and trajectory.
 
     Parameters
     ----------
@@ -37,13 +44,15 @@ def neb(
         Force convergence criterion in eV/Å. Default is 0.1.
     steps : int
         Maximum optimisation steps. Default is 100.
+    interpolator : str
+        Interpolation method ("pymatgen" or "ase"). Default is "pymatgen".
     results_path : Path
         Directory to write output files.
 
     Returns
     -------
     dict
-        barrier (eV), delta_e (eV), max_force (eV/Å).
+        barrier, delta_e, max_force, neb_svg, neb_traj (extxyz string).
     """
     neb_calc = NEB(
         init_struct=init_struct,
@@ -53,15 +62,40 @@ def neb(
         n_images=n_images,
         fmax=fmax,
         steps=steps,
+        minimize=True,
+        interpolator=interpolator,
         write_results=True,
         file_prefix=str(results_path / "neb"),
     )
     results = neb_calc.run()
+
+    # Energy profile SVG
+    neb_svg = None
+    try:
+        fig = neb_calc.nebtools.plot_band()
+        buf = io.StringIO()
+        fig.savefig(buf, format="svg", bbox_inches="tight")
+        plt.close(fig)
+        neb_svg = buf.getvalue()
+    except Exception:
+        pass
+
+    # NEB trajectory as extxyz (all images including endpoints)
+    neb_traj = None
+    try:
+        images = neb_calc.nebtools.images
+        buf_xyz = io.StringIO()
+        ase_write(buf_xyz, images, format="extxyz")
+        neb_traj = buf_xyz.getvalue()
+    except Exception:
+        pass
 
     return handle_data_types(
         {
             "barrier": results.get("barrier"),
             "delta_e": results.get("delta_E"),
             "max_force": results.get("max_force"),
+            "neb_svg": neb_svg,
+            "neb_traj": neb_traj,
         }
     )

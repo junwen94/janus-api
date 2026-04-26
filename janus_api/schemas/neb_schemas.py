@@ -15,6 +15,7 @@ class NEBRequest(BaseModel):
     n_images: int = 15
     fmax: float = 0.1
     steps: int = 100
+    interpolator: str = "pymatgen"
 
 
 class NEBResults(BaseModel):
@@ -23,3 +24,5 @@ class NEBResults(BaseModel):
     barrier: float | None = None
     delta_e: float | None = None
     max_force: float | None = None
+    neb_svg: str | None = None
+    neb_traj: str | None = None
