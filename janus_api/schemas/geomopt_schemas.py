@@ -28,3 +28,4 @@ class GeomOptRequest(BaseModel):
     fmax: float | None = 0.1
     steps: int | None = 1000
     format: str | None = "cif"
+    relax_mode: str = "ionic"
