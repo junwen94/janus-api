@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import traceback
-from io import StringIO
+from io import BytesIO
 from pathlib import Path
 
 import numpy as np
@@ -86,9 +86,9 @@ def geomopt(
             cell=opt_struct.get_cell(),
             pbc=opt_struct.get_pbc(),
         )
-        sio = StringIO()
+        sio = BytesIO()
         ase_write(sio, clean, format="cif")
-        optimised_structure = sio.getvalue()
+        optimised_structure = sio.getvalue().decode("utf-8")
         logger.info("CIF serialization succeeded, length=%d", len(optimised_structure))
     except Exception:
         logger.error("CIF serialization failed:\n%s", traceback.format_exc())
