@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from janus_core.calculations.eos import EoS
 from janus_core.helpers.janus_types import Architectures, EoSNames
@@ -59,10 +64,21 @@ def eos(
     )
     results = eos_calc.run()
 
+    eos_obj = results.get("eos")
+    eos_svg = None
+    if eos_obj is not None:
+        fig, ax = plt.subplots(figsize=(6, 4))
+        eos_obj.plot(ax=ax, show=False)
+        buf = io.StringIO()
+        fig.savefig(buf, format="svg", bbox_inches="tight")
+        plt.close(fig)
+        eos_svg = buf.getvalue()
+
     return {
         "bulk_modulus": results.get("bulk_modulus"),
         "v_0": results.get("v_0"),
         "e_0": results.get("e_0"),
         "volumes": handle_data_types(getattr(eos_calc, "volumes", None)),
         "energies": handle_data_types(getattr(eos_calc, "energies", None)),
+        "eos_svg": eos_svg,
     }

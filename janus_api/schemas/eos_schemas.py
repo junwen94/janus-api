@@ -25,3 +25,4 @@ class EoSResults(BaseModel):
     e_0: float | None = None
     volumes: list[float] | None = None
     energies: list[float] | None = None
+    eos_svg: str | None = None
