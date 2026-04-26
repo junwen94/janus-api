@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import traceback
 from io import StringIO
 from pathlib import Path
 
@@ -12,6 +14,8 @@ from janus_core.calculations.geom_opt import GeomOpt
 from janus_core.helpers.janus_types import Architectures
 
 from janus_api.constants import DATA_DIR
+
+logger = logging.getLogger(__name__)
 
 
 def geomopt(
@@ -42,16 +46,7 @@ def geomopt(
     -------
     dict
         final_energy, max_force, optimised_structure (CIF string).
-
-    Notes
-    -----
-    Pipeline: GeomOpt writes extxyz (janus-core native) → ASE reads back →
-    clean Atoms (no info dict) → CIF string. The clean step drops
-    final_spacegroup from atoms.info, preventing ASE from writing a CIF
-    with a space group name but no symmetry operations (which WEAS rejects).
     """
-    traj_path = DATA_DIR / f"{struct.stem}-traj.traj"
-
     geomopt_kwargs: dict = {
         "struct": struct,
         "arch": arch,
@@ -59,8 +54,7 @@ def geomopt(
         "fmax": fmax,
         "steps": steps,
         "write_results": False,
-        "write_traj": True,
-        "traj_kwargs": {"filename": str(traj_path)},
+        "write_traj": False,
     }
 
     if relax_mode == "ionic":
@@ -86,9 +80,6 @@ def geomopt(
         max_force = None
 
     try:
-        # Strip info dict (contains final_spacegroup set by janus-core) before
-        # writing CIF — prevents ASE from emitting a space group name without
-        # symmetry operations, which WEAS cannot parse.
         clean = Atoms(
             symbols=opt_struct.get_chemical_symbols(),
             positions=opt_struct.get_positions(),
@@ -98,7 +89,9 @@ def geomopt(
         sio = StringIO()
         ase_write(sio, clean, format="cif")
         optimised_structure = sio.getvalue()
+        logger.info("CIF serialization succeeded, length=%d", len(optimised_structure))
     except Exception:
+        logger.error("CIF serialization failed:\n%s", traceback.format_exc())
         optimised_structure = None
 
     return {
