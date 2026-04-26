@@ -16,7 +16,7 @@ classifiers = [
 readme = "README.md"
 
 dependencies = [
-    "janus-core[mace]",
+    "janus-core",
     "fastapi<1.0.0,>=0.95.0",
     "uvicorn<1.0.0,>=0.22.0",
     "python-multipart",
