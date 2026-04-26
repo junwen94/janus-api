@@ -63,6 +63,7 @@ def geomopt(
         "read_kwargs": read_kwargs,
         "write_results": write_results,
         "write_kwargs": write_kwargs,
+        "write_traj": True,
         "opt_kwargs": opt_kwargs,
         "traj_kwargs": traj_kwargs,
     }
