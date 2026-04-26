@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from io import StringIO
 from pathlib import Path
 
 import numpy as np
-from ase.filters import ExpCellFilter
-from ase.io import write as ase_write
 from janus_core.calculations.geom_opt import GeomOpt
 from janus_core.helpers.janus_types import Architectures
 
@@ -19,7 +16,6 @@ def geomopt(
     arch: Architectures | None = "mace_mp",
     fmax: float = 0.1,
     steps: int = 1000,
-    format: str | None = "cif",
     relax_mode: str = "ionic",
     **_,
 ) -> dict:
@@ -36,38 +32,41 @@ def geomopt(
         Force convergence criterion in eV/Å. Default is 0.1.
     steps : int
         Maximum optimisation steps. Default is 1000.
-    format : str
-        Output file format (unused, kept for schema compat).
+    relax_mode : str
+        One of "ionic" (positions only), "cell" (hydrostatic), or "full".
 
     Returns
     -------
     dict
-        final_energy, max_force, optimised_structure (VASP string).
+        final_energy, max_force, optimised_structure (JSON: symbols/positions/cell/pbc).
+
+    Notes
+    -----
+    janus-core 0.9.2 default filter is FrechetCellFilter.
+    - ionic: filter_class=None (positions only, cell fixed)
+    - cell:  default FrechetCellFilter + hydrostatic_strain=True
+    - full:  default FrechetCellFilter (positions + full cell tensor)
     """
     traj_path = DATA_DIR / f"{struct.stem}-traj.traj"
 
-    if relax_mode == "cell":
-        filter_class = ExpCellFilter
-        filter_kwargs = {"hydrostatic_strain": True}
-    elif relax_mode == "full":
-        filter_class = ExpCellFilter
-        filter_kwargs = {}
-    else:
-        filter_class = None
-        filter_kwargs = {}
+    geomopt_kwargs: dict = {
+        "struct": struct,
+        "arch": arch,
+        "device": "cpu",
+        "fmax": fmax,
+        "steps": steps,
+        "write_results": False,
+        "write_traj": True,
+        "traj_kwargs": {"filename": str(traj_path)},
+    }
 
-    geom_opt = GeomOpt(
-        struct=struct,
-        arch=arch,
-        device="cpu",
-        fmax=fmax,
-        steps=steps,
-        filter_class=filter_class,
-        filter_kwargs=filter_kwargs if filter_class else None,
-        write_results=False,
-        write_traj=True,
-        traj_kwargs={"filename": str(traj_path)},
-    )
+    if relax_mode == "ionic":
+        geomopt_kwargs["filter_class"] = None
+    elif relax_mode == "cell":
+        geomopt_kwargs["filter_kwargs"] = {"hydrostatic_strain": True}
+    # "full": use janus-core defaults (FrechetCellFilter, no extra kwargs)
+
+    geom_opt = GeomOpt(**geomopt_kwargs)
     geom_opt.run()
 
     opt_struct = geom_opt.struct
@@ -84,9 +83,12 @@ def geomopt(
         max_force = None
 
     try:
-        sio = StringIO()
-        ase_write(sio, opt_struct, format="vasp")
-        optimised_structure = sio.getvalue()
+        optimised_structure = {
+            "symbols": list(opt_struct.get_chemical_symbols()),
+            "positions": opt_struct.get_positions().tolist(),
+            "cell": opt_struct.get_cell().tolist(),
+            "pbc": [bool(p) for p in opt_struct.get_pbc()],
+        }
     except Exception:
         optimised_structure = None
 
