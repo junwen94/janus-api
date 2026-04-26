@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 from ase import Atoms
-from ase.io import read as ase_read, write as ase_write
+from ase.io import write as ase_write
 from janus_core.calculations.geom_opt import GeomOpt
 from janus_core.helpers.janus_types import Architectures
 
@@ -51,7 +51,6 @@ def geomopt(
     with a space group name but no symmetry operations (which WEAS rejects).
     """
     traj_path = DATA_DIR / f"{struct.stem}-traj.traj"
-    opt_path = DATA_DIR / f"{struct.stem}-opt.extxyz"
 
     geomopt_kwargs: dict = {
         "struct": struct,
@@ -59,8 +58,7 @@ def geomopt(
         "device": "cpu",
         "fmax": fmax,
         "steps": steps,
-        "write_results": True,
-        "write_kwargs": {"filename": str(opt_path)},
+        "write_results": False,
         "write_traj": True,
         "traj_kwargs": {"filename": str(traj_path)},
     }
@@ -88,15 +86,14 @@ def geomopt(
         max_force = None
 
     try:
-        # Read the extxyz janus-core wrote, then strip all info/arrays before
+        # Strip info dict (contains final_spacegroup set by janus-core) before
         # writing CIF — prevents ASE from emitting a space group name without
-        # symmetry operations (which WEAS cannot handle).
-        extxyz_atoms = ase_read(str(opt_path))
+        # symmetry operations, which WEAS cannot parse.
         clean = Atoms(
-            symbols=extxyz_atoms.get_chemical_symbols(),
-            positions=extxyz_atoms.get_positions(),
-            cell=extxyz_atoms.get_cell(),
-            pbc=extxyz_atoms.get_pbc(),
+            symbols=opt_struct.get_chemical_symbols(),
+            positions=opt_struct.get_positions(),
+            cell=opt_struct.get_cell(),
+            pbc=opt_struct.get_pbc(),
         )
         sio = StringIO()
         ase_write(sio, clean, format="cif")
