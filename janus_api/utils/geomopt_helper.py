@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from io import StringIO
 from pathlib import Path
 
 import numpy as np
+from ase import Atoms
+from ase.io import read as ase_read, write as ase_write
 from janus_core.calculations.geom_opt import GeomOpt
 from janus_core.helpers.janus_types import Architectures
 
@@ -38,16 +41,17 @@ def geomopt(
     Returns
     -------
     dict
-        final_energy, max_force, optimised_structure (JSON: symbols/positions/cell/pbc).
+        final_energy, max_force, optimised_structure (CIF string).
 
     Notes
     -----
-    janus-core 0.9.2 default filter is FrechetCellFilter.
-    - ionic: filter_class=None (positions only, cell fixed)
-    - cell:  default FrechetCellFilter + hydrostatic_strain=True
-    - full:  default FrechetCellFilter (positions + full cell tensor)
+    Pipeline: GeomOpt writes extxyz (janus-core native) → ASE reads back →
+    clean Atoms (no info dict) → CIF string. The clean step drops
+    final_spacegroup from atoms.info, preventing ASE from writing a CIF
+    with a space group name but no symmetry operations (which WEAS rejects).
     """
     traj_path = DATA_DIR / f"{struct.stem}-traj.traj"
+    opt_path = DATA_DIR / f"{struct.stem}-opt.extxyz"
 
     geomopt_kwargs: dict = {
         "struct": struct,
@@ -55,7 +59,8 @@ def geomopt(
         "device": "cpu",
         "fmax": fmax,
         "steps": steps,
-        "write_results": False,
+        "write_results": True,
+        "write_kwargs": {"filename": str(opt_path)},
         "write_traj": True,
         "traj_kwargs": {"filename": str(traj_path)},
     }
@@ -64,7 +69,7 @@ def geomopt(
         geomopt_kwargs["filter_class"] = None
     elif relax_mode == "cell":
         geomopt_kwargs["filter_kwargs"] = {"hydrostatic_strain": True}
-    # "full": use janus-core defaults (FrechetCellFilter, no extra kwargs)
+    # "full": janus-core default FrechetCellFilter
 
     geom_opt = GeomOpt(**geomopt_kwargs)
     geom_opt.run()
@@ -83,12 +88,19 @@ def geomopt(
         max_force = None
 
     try:
-        optimised_structure = {
-            "symbols": list(opt_struct.get_chemical_symbols()),
-            "positions": opt_struct.get_positions().tolist(),
-            "cell": opt_struct.get_cell().tolist(),
-            "pbc": [bool(p) for p in opt_struct.get_pbc()],
-        }
+        # Read the extxyz janus-core wrote, then strip all info/arrays before
+        # writing CIF — prevents ASE from emitting a space group name without
+        # symmetry operations (which WEAS cannot handle).
+        extxyz_atoms = ase_read(str(opt_path))
+        clean = Atoms(
+            symbols=extxyz_atoms.get_chemical_symbols(),
+            positions=extxyz_atoms.get_positions(),
+            cell=extxyz_atoms.get_cell(),
+            pbc=extxyz_atoms.get_pbc(),
+        )
+        sio = StringIO()
+        ase_write(sio, clean, format="cif")
+        optimised_structure = sio.getvalue()
     except Exception:
         optimised_structure = None
 
