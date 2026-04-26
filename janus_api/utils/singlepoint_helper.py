@@ -52,7 +52,7 @@ def singlepoint(
     write_kwargs = {"filename": results_path, "format": format}
 
     singlepoint_kwargs = {
-        "struct_path": struct,
+        "struct": struct,
         "properties": properties,
         "arch": arch,
         "device": "cpu",

@@ -55,7 +55,7 @@ def geomopt(
     traj_kwargs = {"filename": str(traj_path)}
 
     geomopt_kwargs = {
-        "struct_path": struct,
+        "struct": struct,
         "arch": arch,
         "device": "cpu",
         "fmax": fmax,
@@ -65,7 +65,6 @@ def geomopt(
         "write_kwargs": write_kwargs,
         "opt_kwargs": opt_kwargs,
         "traj_kwargs": traj_kwargs,
-        "filter_func": None,
     }
 
     geom_opt = GeomOpt(**geomopt_kwargs)
