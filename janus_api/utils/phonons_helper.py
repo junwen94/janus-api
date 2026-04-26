@@ -23,7 +23,7 @@ def phonons(
     results_path: Path = DATA_DIR,
 ) -> dict:
     """
-    Perform phonon calculations and return thermal properties.
+    Perform phonon calculations and return band structure + thermal properties.
 
     Parameters
     ----------
@@ -49,7 +49,7 @@ def phonons(
     Returns
     -------
     dict
-        Thermal properties: temperatures, heat_capacity, entropy, free_energy.
+        thermal properties + band_svg (SVG string) + band_yaml (phonopy YAML with eigenvectors).
     """
     phonons_calc = Phonons(
         struct=struct,
@@ -58,20 +58,38 @@ def phonons(
         supercell=supercell,
         displacement=displacement,
         symmetrize=symmetrize,
-        calcs=("thermal",),
+        calcs=("bands", "thermal"),
         temp_min=temp_min,
         temp_max=temp_max,
         temp_step=temp_step,
         write_results=True,
+        plot_to_file=True,
         hdf5=False,
         file_prefix=str(results_path / struct.stem),
     )
     phonons_calc.run()
 
-    thermal = phonons_calc.results.get("thermal", {})
+    # Thermal properties (key is 'thermal_properties', not 'thermal')
+    thermal = phonons_calc.results.get("thermal_properties", {})
+
+    # SVG band structure plot written to disk by janus-core
+    svg_path = Path(phonons_calc.bands_plot_file) if phonons_calc.bands_plot_file else None
+    band_svg = svg_path.read_text() if svg_path and svg_path.exists() else None
+
+    # band.yaml with eigenvectors — written from the phonopy object
+    phonopy_obj = phonons_calc.results.get("phonon")
+    band_yaml = None
+    if phonopy_obj is not None:
+        band_yaml_path = results_path / f"{struct.stem}-bands-eigvec.yaml"
+        phonopy_obj.write_yaml_band_structure(filename=str(band_yaml_path))
+        if band_yaml_path.exists():
+            band_yaml = band_yaml_path.read_text()
+
     return {
         "temperatures": handle_data_types(thermal.get("temperatures")),
         "heat_capacity": handle_data_types(thermal.get("heat_capacity")),
         "entropy": handle_data_types(thermal.get("entropy")),
         "free_energy": handle_data_types(thermal.get("free_energy")),
+        "band_svg": band_svg,
+        "band_yaml": band_yaml,
     }

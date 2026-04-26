@@ -26,3 +26,5 @@ class PhononsResults(BaseModel):
     heat_capacity: list[float] | None = None
     entropy: list[float] | None = None
     free_energy: list[float] | None = None
+    band_svg: str | None = None
+    band_yaml: str | None = None
