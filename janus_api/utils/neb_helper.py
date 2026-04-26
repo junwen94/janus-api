@@ -54,20 +54,31 @@ def neb(
     dict
         barrier, delta_e, max_force, neb_svg, neb_traj (extxyz string).
     """
-    neb_calc = NEB(
-        init_struct=init_struct,
-        final_struct=final_struct,
-        arch=arch,
-        device="cpu",
-        n_images=n_images,
-        fmax=fmax,
-        steps=steps,
-        minimize=True,
-        interpolator=interpolator,
-        write_results=True,
-        file_prefix=str(results_path / "neb"),
-    )
-    results = neb_calc.run()
+    def _make_neb(interp: str) -> NEB:
+        return NEB(
+            init_struct=init_struct,
+            final_struct=final_struct,
+            arch=arch,
+            device="cpu",
+            n_images=n_images,
+            fmax=fmax,
+            steps=steps,
+            minimize=True,
+            interpolator=interp,
+            write_results=True,
+            file_prefix=str(results_path / "neb"),
+        )
+
+    neb_calc = _make_neb(interpolator)
+    try:
+        results = neb_calc.run()
+    except Exception as e:
+        if interpolator != "ase" and "singular" in str(e).lower():
+            # pymatgen IDPP failed — fall back to ASE linear interpolation
+            neb_calc = _make_neb("ase")
+            results = neb_calc.run()
+        else:
+            raise
 
     # Energy profile SVG
     neb_svg = None
