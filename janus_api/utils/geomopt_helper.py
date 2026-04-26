@@ -51,7 +51,7 @@ def geomopt(
     traj_path = results_path / f"{struct.stem}-traj-results.{format}"
 
     write_kwargs = {"filename": results_file, "format": format}
-    opt_kwargs = {"trajectory": str(traj_path)}
+    opt_kwargs = {}
     traj_kwargs = {"filename": str(traj_path)}
 
     geomopt_kwargs = {
