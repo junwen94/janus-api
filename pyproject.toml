@@ -16,7 +16,7 @@ classifiers = [
 readme = "README.md"
 
 dependencies = [
-    "janus-core",
+    "janus-core[mace]",
     "fastapi<1.0.0,>=0.95.0",
     "uvicorn<1.0.0,>=0.22.0",
     "python-multipart",
@@ -130,3 +130,6 @@ default-groups = [
     "docs",
     "pre-commit",
 ]
+
+[tool.uv.sources]
+janus-core = { path = "../janus-core", editable = true }
