@@ -19,7 +19,7 @@ def singlepoint(
     range_selector: str = ":",
     write_results: bool = True,
     results_path: Path = DATA_DIR,
-    file_format: str = "cif",
+    format: str = "cif",
 ) -> SinglePointResults:
     """
     Perform single point calculations and return results.
@@ -48,8 +48,8 @@ def singlepoint(
         Results of the single point calculations.
     """
     read_kwargs = {"index": range_selector}
-    results_path = results_path / f"{struct.stem}-spoint-results.{file_format}"
-    write_kwargs = {"filename": results_path, "format": f"{file_format}"}
+    results_path = results_path / f"{struct.stem}-spoint-results.{format}"
+    write_kwargs = {"filename": results_path, "format": format}
 
     singlepoint_kwargs = {
         "struct_path": struct,

@@ -42,7 +42,7 @@ async def get_singlepoint(request: SinglePointRequest) -> dict[str, Any]:
 
     try:
         results = singlepoint(
-            struct=struct_path, **request.model_dump(exclude={"struct"})
+            struct=struct_path, **request.model_dump(exclude={"struct"}, exclude_none=True)
         )
 
         results_file_path = results.pop("results_path", None)
