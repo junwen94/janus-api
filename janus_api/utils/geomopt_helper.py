@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from io import StringIO
 from pathlib import Path
 
+import numpy as np
+from ase.io import write as ase_write
 from janus_core.calculations.geom_opt import GeomOpt
 from janus_core.helpers.janus_types import Architectures
 
 from janus_api.constants import DATA_DIR
-from janus_api.schemas.geomopt_schemas import GeomOptResults
-from janus_api.utils.data_conversion_helper import handle_data_types
 
 
 def geomopt(
@@ -17,69 +18,66 @@ def geomopt(
     arch: Architectures | None = "mace_mp",
     fmax: float = 0.1,
     steps: int = 1000,
-    write_results: bool | None = True,
-    results_path: Path | None = DATA_DIR,
     format: str | None = "cif",
-) -> GeomOptResults:
+    **_,
+) -> dict:
     """
-    Perform geometry optimisation and return results.
+    Perform geometry optimisation and return results including optimised structure.
 
     Parameters
     ----------
     struct : Path
         Path of structure to optimise.
     arch : Architectures
-        MLIP architecture to use for geometry optimisation. Default is "mace_mp".
+        MLIP architecture. Default is "mace_mp".
     fmax : float
-        Force convergence criteria for the optimiser, by default 0.1 eV/Å.
+        Force convergence criterion in eV/Å. Default is 0.1.
     steps : int
-        Maximum number of optimisation steps, by default 1000.
-    write_results : bool | None, default is True
-        Tells function if to save the results of the calculation or not.
-    results_path : Path | None
-        Location to save the results.
+        Maximum optimisation steps. Default is 1000.
     format : str
-        File format to output results as.
+        Output file format (unused, kept for schema compat).
 
     Returns
     -------
-    GeomOptResults
-        Results of the geometry optimisation.
+    dict
+        final_energy, max_force, optimised_structure (VASP string).
     """
-    read_kwargs = {"index": -1}
-    results_file = results_path / f"{struct.stem}-geom-results.{format}"
-    traj_path = results_path / f"{struct.stem}-traj-results.{format}"
+    traj_path = DATA_DIR / f"{struct.stem}-traj.traj"
 
-    write_kwargs = {"filename": results_file, "format": format}
-    opt_kwargs = {}
-    traj_kwargs = {"filename": str(traj_path)}
-
-    geomopt_kwargs = {
-        "struct": struct,
-        "arch": arch,
-        "device": "cpu",
-        "fmax": fmax,
-        "steps": steps,
-        "read_kwargs": read_kwargs,
-        "write_results": write_results,
-        "write_kwargs": write_kwargs,
-        "write_traj": True,
-        "opt_kwargs": opt_kwargs,
-        "traj_kwargs": traj_kwargs,
-    }
-
-    geom_opt = GeomOpt(**geomopt_kwargs)
-
+    geom_opt = GeomOpt(
+        struct=struct,
+        arch=arch,
+        device="cpu",
+        fmax=fmax,
+        steps=steps,
+        write_results=False,
+        write_traj=True,
+        traj_kwargs={"filename": str(traj_path)},
+    )
     geom_opt.run()
-    results = handle_data_types(geom_opt.struct.info)
-    results["results_path"] = results_file
-    results["traj_path"] = traj_path
 
-    return results
+    opt_struct = geom_opt.struct
 
+    try:
+        final_energy = float(opt_struct.get_potential_energy())
+    except Exception:
+        final_energy = None
 
-if __name__ == "__main__":
-    struct_path = DATA_DIR / "c60.xyz"
-    optimised_results = geomopt(struct_path)
+    try:
+        forces = opt_struct.get_forces()
+        max_force = float(np.max(np.linalg.norm(forces, axis=1)))
+    except Exception:
+        max_force = None
 
-    print(optimised_results)
+    try:
+        sio = StringIO()
+        ase_write(sio, opt_struct, format="vasp")
+        optimised_structure = sio.getvalue()
+    except Exception:
+        optimised_structure = None
+
+    return {
+        "final_energy": final_energy,
+        "max_force": max_force,
+        "optimised_structure": optimised_structure,
+    }
